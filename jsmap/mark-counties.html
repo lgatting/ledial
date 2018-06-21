@@ -1,0 +1,70 @@
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="https://d3js.org/topojson.v2.min.js"></script>
+<script src="helpers.js"></script>
+<script>
+var dialectFiles = ["dialects.geo.json"];
+
+
+d3.json("cb_2016_us_county_20m.topo.json", function(error, geocounties) {
+    if (error)
+        throw error;
+    
+    var countiesData = topojson.feature(geocounties, geocounties.objects.cb_2016_us_county_20m).features;
+
+    var polyResults = {};
+
+    // Iterate each dialect polygon file
+    for (var i = 0; i < dialectFiles.length; i++) {
+        var dialectFile = dialectFiles[i];
+
+        // Get dialect polygon data
+        d3.json("dialects/" + dialectFile, function(error, geodialects) {
+            if (error)
+                throw error;
+            
+            for (var l = 0; l < geodialects.features.length; l++) {
+                var geodialectFeatures = geodialects.features[l];
+                
+                var vertx = [];
+                var verty = [];
+                
+                var coords = geodialectFeatures.geometry.coordinates[0];
+
+                for (var j = 0; j < coords.length; j++) {
+                    coord = coords[j];
+
+                    vertx.push(coord[0]);
+                    verty.push(coord[1]);
+                }
+                
+                for (var k = 0; k < countiesData.length; k++) {
+                    var countyData = countiesData[k];
+                    var countyCoords = countyData.geometry.coordinates;
+
+                    var countyPoints;
+                    if (countyCoords.length > 1)
+                        // If county consists of multiple shapes, then calculate centroid of each shape and use the coords
+                        // of these centroids as the county coords
+                        for (var m = 0; m < countyCoords.length; m++)
+                            countyPoints = helpers.centroid(countyCoords[m]);
+                    else
+                        // If county consists of only one shape, use that as the county coords
+                        countyPoints = countyCoords[0];
+
+                    // A point-representation of a county
+                    var countyPoint = helpers.centroid(countyPoints);
+
+                    var inPoly = helpers.inPolygon(coords.length, vertx, verty, countyPoint[0], countyPoint[1]);
+
+                    if (inPoly)
+                        polyResults[countyData.properties.GEOID] = geodialectFeatures.properties.Name;
+                }
+            }
+
+            console.log(JSON.stringify(polyResults));
+        });
+    }
+});
+</script>
+
+<p>Check browser console to see the output.</p>
